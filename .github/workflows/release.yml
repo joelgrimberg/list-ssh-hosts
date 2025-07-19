@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  CGO_ENABLED: 0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build for multiple platforms
+        run: |
+          # Get version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF#refs/tags/}
+          
+          # Build for multiple platforms
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ssh-hosts-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ssh-hosts-linux-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ssh-hosts-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ssh-hosts-darwin-arm64 .
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ssh-hosts-windows-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o ssh-hosts-windows-arm64.exe .
+          
+          # Create checksums
+          sha256sum ssh-hosts-* > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ssh-hosts-linux-amd64
+            ssh-hosts-linux-arm64
+            ssh-hosts-darwin-amd64
+            ssh-hosts-darwin-arm64
+            ssh-hosts-windows-amd64.exe
+            ssh-hosts-windows-arm64.exe
+            checksums.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

@@ -1,0 +1,42 @@
+name: Go Build Matrix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Install dependencies
+        run: go mod tidy
+      - name: Build (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          CGO_ENABLED=0 go build -v -o ssh-hosts-ubuntu-latest
+      - name: Upload Linux binary artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-hosts-ubuntu-latest
+          path: ssh-hosts-ubuntu-latest
+      - name: Build (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          go build -v -o ssh-hosts-macos-latest
+      - name: Upload macOS binary artifact
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-hosts-macos-latest
+          path: ssh-hosts-macos-latest 
