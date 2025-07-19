@@ -1,4 +1,4 @@
-# ssh-hosts
+# jumphost
 
 A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~/.ssh/config` file.
 
@@ -31,22 +31,22 @@ A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~
 
 1. Go to the [Releases](https://github.com/yourusername/ssh-hosts/releases) page
 2. Download the appropriate binary for your platform:
-   - **Linux**: `ssh-hosts-linux-amd64` or `ssh-hosts-linux-arm64`
-   - **macOS**: `ssh-hosts-darwin-amd64` or `ssh-hosts-darwin-arm64`
-   - **Windows**: `ssh-hosts-windows-amd64.exe` or `ssh-hosts-windows-arm64.exe`
+   - **Linux**: `linux-amd64/jumphost` or `linux-arm64/jumphost`
+   - **macOS**: `darwin-amd64/jumphost` or `darwin-arm64/jumphost`
+   - **Windows**: `windows-amd64/jumphost.exe` or `windows-arm64/jumphost.exe`
 
 3. Make it executable (Linux/macOS):
    ```sh
-   chmod +x ssh-hosts-linux-amd64
+   chmod +x linux-amd64/jumphost
    ```
 
 4. Move to your PATH (optional):
    ```sh
    # Linux/macOS
-   sudo mv ssh-hosts-linux-amd64 /usr/local/bin/ssh-hosts
+   sudo mv linux-amd64/jumphost /usr/local/bin/jumphost
    
    # Windows (run as Administrator)
-   move ssh-hosts-windows-amd64.exe C:\Windows\System32\ssh-hosts.exe
+   move windows-amd64/jumphost.exe C:\Windows\System32\jumphost.exe
    ```
 
 ### Option 2: Build from Source
@@ -54,14 +54,14 @@ A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~
 ```sh
 git clone https://github.com/yourusername/ssh-hosts.git
 cd ssh-hosts
-go build -o ssh-hosts
+go build -o jumphost
 ```
 
 ## Usage
 
 1. **Run the application:**
    ```sh
-   ./ssh-hosts
+   ./jumphost
    ```
 
 2. **Navigate the interface:**
@@ -103,7 +103,7 @@ Host staging-server
 
 ### Build
 ```sh
-go build -o ssh-hosts
+go build -o jumphost
 ```
 
 ### Test
@@ -113,7 +113,7 @@ go test -v
 
 ### Run
 ```sh
-./ssh-hosts
+./jumphost
 ```
 
 ## CI/CD
