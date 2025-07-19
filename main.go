@@ -222,6 +222,14 @@ func (m *model) View() string {
 			b.WriteString("\n\n")
 		}
 
+		// "Enter password:" text styled like help text
+		helpStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+			Light: "#B2B2B2",
+			Dark:  "#4A4A4A",
+		})
+		b.WriteString(helpStyle.Render("enter password:"))
+		b.WriteString("\n")
+
 		// Password input field
 		b.WriteString(m.pwInput.View())
 		b.WriteString("\n\n")
