@@ -47,17 +47,25 @@ jobs:
           
           # Create checksums
           find . -name "jumphost*" -type f -exec sha256sum {} \; > checksums.txt
+          
+          # Copy files to root for upload
+          cp linux-amd64/jumphost ./jumphost-linux-amd64
+          cp linux-arm64/jumphost ./jumphost-linux-arm64
+          cp darwin-amd64/jumphost ./jumphost-darwin-amd64
+          cp darwin-arm64/jumphost ./jumphost-darwin-arm64
+          cp windows-amd64/jumphost.exe ./jumphost-windows-amd64.exe
+          cp windows-arm64/jumphost.exe ./jumphost-windows-arm64.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            linux-amd64/jumphost
-            linux-arm64/jumphost
-            darwin-amd64/jumphost
-            darwin-arm64/jumphost
-            windows-amd64/jumphost.exe
-            windows-arm64/jumphost.exe
+            jumphost-linux-amd64
+            jumphost-linux-arm64
+            jumphost-darwin-amd64
+            jumphost-darwin-arm64
+            jumphost-windows-amd64.exe
+            jumphost-windows-arm64.exe
             checksums.txt
           draft: false
           prerelease: false
