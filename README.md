@@ -7,6 +7,7 @@ A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~
 - Interactive TUI for host selection (powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea))
 - Secure password entry with a TUI input field (no default SSH prompt)
 - Multi-screen interface: host list → password input → login progress
+- Host management: delete entries directly from the SSH config
 - Cross-platform: Linux, macOS, and Windows support
 - Statically linked binaries with no external dependencies
 
@@ -66,7 +67,8 @@ go build -o jumphost
 
 2. **Navigate the interface:**
    - Use arrow keys to navigate the host list
-   - Press `Enter` to select a host
+   - Press `Enter` to connect to the selected host
+   - Press `Delete` or `x` to remove the selected host from SSH config
    - Enter your password in the TUI input field
    - Press `Esc` to go back to the host list
    - Press `Ctrl+C` to quit

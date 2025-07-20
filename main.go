@@ -52,6 +52,20 @@ type loginResultMsg struct {
 	err     error
 }
 
+// ListKeyMap defines the key bindings for the main list screen
+type ListKeyMap struct {
+	Enter  key.Binding
+	Delete key.Binding
+}
+
+func (k ListKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Enter, k.Delete}
+}
+
+func (k ListKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{k.Enter, k.Delete}}
+}
+
 // PasswordKeyMap defines the key bindings for the password screen
 type PasswordKeyMap struct {
 	Esc key.Binding
@@ -77,6 +91,7 @@ type model struct {
 	loggingIn    bool
 	shouldSSH    bool // NEW: set to true after successful login
 	help         help.Model
+	listKeys     ListKeyMap
 	keys         PasswordKeyMap
 }
 
@@ -93,6 +108,17 @@ func initialModel(items []list.Item) *model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	listKeys := ListKeyMap{
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "connect"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("delete", "x"),
+			key.WithHelp("x", "remove host"),
+		),
+	}
+
 	keys := PasswordKeyMap{
 		Esc: key.NewBinding(
 			key.WithKeys("esc"),
@@ -101,12 +127,13 @@ func initialModel(items []list.Item) *model {
 	}
 
 	return &model{
-		list:    l,
-		screen:  listScreen,
-		pwInput: pw,
-		spinner: s,
-		help:    help.New(),
-		keys:    keys,
+		list:     l,
+		screen:   listScreen,
+		pwInput:  pw,
+		spinner:  s,
+		help:     help.New(),
+		listKeys: listKeys,
+		keys:     keys,
 	}
 }
 
@@ -130,6 +157,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pwInput.SetValue("")
 					m.errMsg = ""
 					m.screen = passwordScreen
+					return m, nil
+				}
+			case "delete", "x":
+				selected, ok := m.list.SelectedItem().(hostItem)
+				if ok {
+					// Delete the host from SSH config
+					if err := deleteHostFromConfig(selected.host); err != nil {
+						// Could show error message here if needed
+						return m, nil
+					}
+					// Reload the list
+					usr, _ := user.Current()
+					sshConfigPath := filepath.Join(usr.HomeDir, ".ssh", "config")
+					if hosts, err := parseSSHConfig(sshConfigPath); err == nil {
+						items := make([]list.Item, len(hosts))
+						for i, h := range hosts {
+							items[i] = h
+						}
+						m.list.SetItems(items)
+					}
 					return m, nil
 				}
 			}
@@ -207,7 +254,11 @@ func (m *model) passwordHelpBar() string {
 func (m *model) View() string {
 	switch m.screen {
 	case listScreen:
-		return docStyle.Render(m.list.View())
+		var b strings.Builder
+		b.WriteString(m.list.View())
+		b.WriteString("\n")
+		b.WriteString(m.help.View(m.listKeys))
+		return docStyle.Render(b.String())
 	case passwordScreen:
 		var b strings.Builder
 
@@ -315,6 +366,81 @@ func parseSSHConfig(path string) ([]hostItem, error) {
 		}
 	}
 	return items, scanner.Err()
+}
+
+// deleteHostFromConfig removes a host entry from the SSH config file
+func deleteHostFromConfig(hostToDelete string) error {
+	usr, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(usr.HomeDir, ".ssh", "config")
+
+	// Read the entire config file
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	var inHostBlock bool
+	var currentHosts []string
+	var skipBlock bool
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		if strings.HasPrefix(strings.ToLower(trimmedLine), "host ") {
+			// Check if this host block contains our target
+			fields := strings.Fields(trimmedLine)
+			currentHosts = fields[1:]
+
+			// If this block contains our target, mark it for skipping
+			if contains(currentHosts, hostToDelete) {
+				skipBlock = true
+				continue
+			} else {
+				skipBlock = false
+				inHostBlock = true
+				newLines = append(newLines, line)
+			}
+			continue
+		}
+
+		// If we're skipping this block, don't add any lines
+		if skipBlock {
+			// If this line is not indented, we're out of the host block
+			if len(line) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				skipBlock = false
+				inHostBlock = false
+				newLines = append(newLines, line)
+			}
+			continue
+		}
+
+		// If this line is not indented, we're out of the host block
+		if inHostBlock && len(line) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+			inHostBlock = false
+		}
+
+		newLines = append(newLines, line)
+	}
+
+	// Write the modified content back to the file
+	newContent := strings.Join(newLines, "\n")
+	return os.WriteFile(configPath, []byte(newContent), 0644)
+}
+
+// contains checks if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 func checkSshpass() {
