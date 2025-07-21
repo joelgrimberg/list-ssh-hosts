@@ -93,6 +93,7 @@ type model struct {
 	help         help.Model
 	listKeys     ListKeyMap
 	keys         PasswordKeyMap
+	infoBox      string // Info box content for hovered host
 }
 
 func initialModel(items []list.Item) *model {
@@ -134,6 +135,7 @@ func initialModel(items []list.Item) *model {
 		help:     help.New(),
 		listKeys: listKeys,
 		keys:     keys,
+		infoBox:  "hello world",
 	}
 }
 
@@ -182,10 +184,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case tea.WindowSizeMsg:
 			h, v := docStyle.GetFrameSize()
-			m.list.SetSize(msg.Width-h, msg.Height-v)
+			// Reserve space for info box (60 chars + 2 spaces)
+			m.list.SetSize(msg.Width-h-62, msg.Height-v)
 		}
+
 		var cmd tea.Cmd
 		m.list, cmd = m.list.Update(msg)
+
+		// Update info box content after list update
+		if m.list.Index() < len(m.list.Items()) {
+			if selected, ok := m.list.Items()[m.list.Index()].(hostItem); ok {
+				hostInfo := getHostInfo(selected.host)
+				m.infoBox = hostInfo
+			}
+		}
+
 		return m, cmd
 	case passwordScreen:
 		switch msg := msg.(type) {
@@ -254,8 +267,23 @@ func (m *model) passwordHelpBar() string {
 func (m *model) View() string {
 	switch m.screen {
 	case listScreen:
+		// Create info box style
+		infoBoxStyle := lipgloss.NewStyle().
+			Width(60).
+			Height(10).
+			Align(lipgloss.Left, lipgloss.Top).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("69")).
+			Padding(1, 1)
+
+		// Create the info box content
+		infoBox := infoBoxStyle.Render(m.infoBox)
+
+		// Join list and info box horizontally
+		content := lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), "  ", infoBox)
+
 		var b strings.Builder
-		b.WriteString(m.list.View())
+		b.WriteString(content)
 		b.WriteString("\n")
 		b.WriteString(m.help.View(m.listKeys))
 		return docStyle.Render(b.String())
@@ -441,6 +469,200 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// getHostInfo extracts all SSH config information for a specific host
+func getHostInfo(hostName string) string {
+	usr, err := user.Current()
+	if err != nil {
+		return "Error: Could not get user info"
+	}
+
+	configPath := filepath.Join(usr.HomeDir, ".ssh", "config")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return "Error: Could not read SSH config"
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	// Find the selected host and its ProxyJump
+	selectedHostInfo := getHostBlock(lines, hostName)
+	if selectedHostInfo == nil {
+		return fmt.Sprintf("Host: %s\n\nNo config found", hostName)
+	}
+
+	// Find jump host if this host uses ProxyJump
+	var jumpHostInfo *hostBlock
+	if jumpHost := getProxyJumpHost(selectedHostInfo.lines); jumpHost != "" {
+		jumpHostInfo = getHostBlock(lines, jumpHost)
+	}
+
+	// Find hosts that jump through this host
+	var jumpingHosts []*hostBlock
+	for _, block := range getAllHostBlocks(lines) {
+		if getProxyJumpHost(block.lines) == hostName {
+			jumpingHosts = append(jumpingHosts, block)
+		}
+	}
+
+	// Format the information
+	var result strings.Builder
+
+	// Show jump host (if this host uses ProxyJump)
+	if jumpHostInfo != nil {
+		result.WriteString(fmt.Sprintf("Jump Host: %s\n", jumpHostInfo.hostName))
+		result.WriteString(strings.Repeat("─", 20) + "\n")
+		for _, line := range jumpHostInfo.lines {
+			if strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "Host ") {
+				result.WriteString(line + "\n")
+			}
+		}
+		result.WriteString("\n")
+	}
+
+	// Show selected host
+	result.WriteString(fmt.Sprintf("Host: %s\n", hostName))
+	result.WriteString(strings.Repeat("─", 20) + "\n")
+	for _, line := range selectedHostInfo.lines {
+		if strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "Host ") {
+			result.WriteString(line + "\n")
+		}
+	}
+
+	// Show hosts that jump through this host
+	if len(jumpingHosts) > 0 {
+		result.WriteString("\n")
+		result.WriteString("Jumped by:\n")
+		result.WriteString(strings.Repeat("─", 20) + "\n")
+		for _, block := range jumpingHosts {
+			result.WriteString(fmt.Sprintf("Host: %s\n", block.hostName))
+			for _, line := range block.lines {
+				if strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "Host ") {
+					result.WriteString(line + "\n")
+				}
+			}
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
+}
+
+// hostBlock represents a host configuration block
+type hostBlock struct {
+	hostName string
+	lines    []string
+}
+
+// getHostBlock extracts a host block from the config lines
+func getHostBlock(lines []string, hostName string) *hostBlock {
+	var hostLines []string
+	var inHostBlock bool
+	var currentHosts []string
+	var foundHostName string
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		if strings.HasPrefix(strings.ToLower(trimmedLine), "host ") {
+			// Check if this host block contains our target
+			fields := strings.Fields(trimmedLine)
+			currentHosts = fields[1:]
+
+			if contains(currentHosts, hostName) {
+				inHostBlock = true
+				foundHostName = hostName
+				hostLines = append(hostLines, line)
+				continue
+			} else {
+				inHostBlock = false
+				continue
+			}
+		}
+
+		// If we're in the target host block, collect all lines
+		if inHostBlock {
+			// If this line is not indented, we're out of the host block
+			if len(line) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				inHostBlock = false
+				break
+			}
+			hostLines = append(hostLines, line)
+		}
+	}
+
+	if len(hostLines) == 0 {
+		return nil
+	}
+
+	return &hostBlock{
+		hostName: foundHostName,
+		lines:    hostLines,
+	}
+}
+
+// getAllHostBlocks extracts all host blocks from the config
+func getAllHostBlocks(lines []string) []*hostBlock {
+	var blocks []*hostBlock
+	var currentBlock *hostBlock
+	var inHostBlock bool
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		if strings.HasPrefix(strings.ToLower(trimmedLine), "host ") {
+			// Save previous block if exists
+			if currentBlock != nil {
+				blocks = append(blocks, currentBlock)
+			}
+
+			// Start new block
+			fields := strings.Fields(trimmedLine)
+			currentHosts := fields[1:]
+			if len(currentHosts) > 0 {
+				currentBlock = &hostBlock{
+					hostName: currentHosts[0], // Use first host name
+					lines:    []string{line},
+				}
+				inHostBlock = true
+			}
+			continue
+		}
+
+		// Add line to current block
+		if inHostBlock && currentBlock != nil {
+			// If this line is not indented, we're out of the host block
+			if len(line) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				inHostBlock = false
+				blocks = append(blocks, currentBlock)
+				currentBlock = nil
+			} else {
+				currentBlock.lines = append(currentBlock.lines, line)
+			}
+		}
+	}
+
+	// Add the last block
+	if currentBlock != nil {
+		blocks = append(blocks, currentBlock)
+	}
+
+	return blocks
+}
+
+// getProxyJumpHost extracts the ProxyJump host from host lines
+func getProxyJumpHost(lines []string) string {
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(trimmedLine), "proxyjump ") {
+			fields := strings.Fields(trimmedLine)
+			if len(fields) > 1 {
+				return fields[1]
+			}
+		}
+	}
+	return ""
 }
 
 func checkSshpass() {
