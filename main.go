@@ -224,7 +224,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case loginResultMsg:
 			m.loggingIn = false
 			if msg.success {
-				// Success: set flag and quit TUI
+				// Success: show success message briefly before quitting
+				var b strings.Builder
+				b.WriteString("\n\n   ✓ Successfully logged in to ")
+				b.WriteString(m.selectedHost)
+				if m.selectedDesc != "" {
+					b.WriteString(" (")
+					b.WriteString(m.selectedDesc)
+					b.WriteString(")")
+				}
+				b.WriteString("\n")
+				fmt.Print(docStyle.Render(b.String()))
+
+				// Set flag and quit TUI
 				m.shouldSSH = true
 				return m, tea.Quit
 			} else {
@@ -320,7 +332,14 @@ func (m *model) View() string {
 		var b strings.Builder
 		b.WriteString("\n\n   ")
 		b.WriteString(m.spinner.View())
-		b.WriteString(" Logging in...")
+		b.WriteString(" Logging in to ")
+		b.WriteString(m.selectedHost)
+		if m.selectedDesc != "" {
+			b.WriteString(" (")
+			b.WriteString(m.selectedDesc)
+			b.WriteString(")")
+		}
+		b.WriteString("...")
 		return docStyle.Render(b.String())
 	}
 	return ""
@@ -717,6 +736,13 @@ func main() {
 
 	// After TUI exits, if login was successful, run SSH
 	if m.shouldSSH && m.selectedHost != "" && m.password != "" {
+		// Show connection info
+		fmt.Printf("\n🔗 Connected to %s", m.selectedHost)
+		if m.selectedDesc != "" {
+			fmt.Printf(" (%s)", m.selectedDesc)
+		}
+		fmt.Println()
+
 		cmd := exec.Command("sshpass", "-p", m.password, "ssh", "-t", m.selectedHost, "env TERM=xterm-256color bash --login")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout

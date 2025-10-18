@@ -1,4 +1,4 @@
-# jumphost
+# ssm - Secure Shell Manager
 
 A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~/.ssh/config` file.
 
@@ -32,22 +32,22 @@ A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~
 
 1. Go to the [Releases](https://github.com/yourusername/ssh-hosts/releases) page
 2. Download the appropriate binary for your platform:
-   - **Linux**: `linux-amd64/jumphost` or `linux-arm64/jumphost`
-   - **macOS**: `darwin-amd64/jumphost` or `darwin-arm64/jumphost`
-   - **Windows**: `windows-amd64/jumphost.exe` or `windows-arm64/jumphost.exe`
+   - **Linux**: `linux-amd64/ssm` or `linux-arm64/ssm`
+   - **macOS**: `darwin-amd64/ssm` or `darwin-arm64/ssm`
+   - **Windows**: `windows-amd64/ssm.exe` or `windows-arm64/ssm.exe`
 
 3. Make it executable (Linux/macOS):
    ```sh
-   chmod +x linux-amd64/jumphost
+   chmod +x linux-amd64/ssm
    ```
 
 4. Move to your PATH (optional):
    ```sh
    # Linux/macOS
-   sudo mv linux-amd64/jumphost /usr/local/bin/jumphost
+   sudo mv linux-amd64/ssm /usr/local/bin/ssm
    
    # Windows (run as Administrator)
-   move windows-amd64/jumphost.exe C:\Windows\System32\jumphost.exe
+   move windows-amd64/ssm.exe C:\Windows\System32\ssm.exe
    ```
 
 ### Option 2: Build from Source
@@ -55,14 +55,14 @@ A terminal UI (TUI) tool to quickly select and SSH into hosts defined in your `~
 ```sh
 git clone https://github.com/yourusername/ssh-hosts.git
 cd ssh-hosts
-go build -o jumphost
+go build -o ssm
 ```
 
 ## Usage
 
 1. **Run the application:**
    ```sh
-   ./jumphost
+   ./ssm
    ```
 
 2. **Navigate the interface:**
@@ -105,7 +105,7 @@ Host staging-server
 
 ### Build
 ```sh
-go build -o jumphost
+go build -o ssm
 ```
 
 ### Test
@@ -115,7 +115,7 @@ go test -v
 
 ### Run
 ```sh
-./jumphost
+./ssm
 ```
 
 ## CI/CD
